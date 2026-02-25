@@ -468,8 +468,49 @@ async function runQuery(
     const msgType = message.type === 'system' ? `system/${(message as { subtype?: string }).subtype}` : message.type;
     log(`[msg #${messageCount}] type=${msgType}`);
 
-    if (message.type === 'assistant' && 'uuid' in message) {
-      lastAssistantUuid = (message as { uuid: string }).uuid;
+    if (message.type === 'assistant') {
+      if ('uuid' in message) {
+        lastAssistantUuid = (message as { uuid: string }).uuid;
+      }
+
+      const contentArr = (message as { message?: { content?: Array<Record<string, unknown>> } }).message?.content;
+      if (contentArr && Array.isArray(contentArr)) {
+        // Forward text blocks immediately
+        const text = contentArr
+          .filter((c) => c.type === 'text' && c.text)
+          .map((c) => c.text as string)
+          .join('');
+        if (text) {
+          log(`Streaming assistant text (${text.length} chars)`);
+          writeOutput({ status: 'success', result: text, newSessionId });
+        }
+
+        // Forward tool_use blocks as status notifications
+        const toolUses = contentArr.filter((c) => c.type === 'tool_use');
+        for (const tool of toolUses) {
+          const name = tool.name as string;
+          const input = tool.input as Record<string, unknown> | undefined;
+          let status: string;
+          if (name === 'Bash' && input?.command) {
+            const cmd = String(input.command);
+            // Strip the secret-unset prefix we inject via hook
+            const cleaned = cmd.replace(/^unset\s+\S+.*?;\s*/, '');
+            status = `⏳ Running: \`${cleaned.length > 200 ? cleaned.slice(0, 200) + '...' : cleaned}\``;
+          } else if (name === 'Read' && input?.file_path) {
+            status = `📖 Reading: \`${input.file_path}\``;
+          } else if ((name === 'Edit' || name === 'Write') && input?.file_path) {
+            status = `✏️ Editing: \`${input.file_path}\``;
+          } else if (name === 'WebSearch' && input?.query) {
+            status = `🔍 Searching: ${input.query}`;
+          } else if (name === 'WebFetch' && input?.url) {
+            status = `🌐 Fetching: ${input.url}`;
+          } else {
+            status = `🔧 Using tool: ${name}`;
+          }
+          log(`Tool status: ${status}`);
+          writeOutput({ status: 'success', result: status, newSessionId });
+        }
+      }
     }
 
     if (message.type === 'system' && message.subtype === 'init') {
@@ -486,9 +527,10 @@ async function runQuery(
       resultCount++;
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
       log(`Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`);
+      // Don't forward result text — assistant messages already streamed it
       writeOutput({
         status: 'success',
-        result: textResult || null,
+        result: null,
         newSessionId
       });
     }

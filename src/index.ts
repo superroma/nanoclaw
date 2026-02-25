@@ -185,7 +185,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   let outputSentToUser = false;
 
   const output = await runAgent(group, prompt, chatJid, async (result) => {
-    // Streaming output callback — called for each agent result
+    // Streaming output callback — called for each agent output marker:
+    //   - assistant text or tool status (result.result = text) — send to user
+    //   - query completion (result.result = null) — agent is idle
+
     if (result.result) {
       const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
@@ -195,11 +198,9 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         await channel.sendMessage(chatJid, text);
         outputSentToUser = true;
       }
-      // Only reset idle timer on actual results, not session-update markers (result: null)
       resetIdleTimer();
-    }
-
-    if (result.status === 'success') {
+    } else if (result.status === 'success') {
+      // Query completion (null result) — agent is idle
       queue.notifyIdle(chatJid);
     }
 
