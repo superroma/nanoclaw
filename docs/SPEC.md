@@ -42,23 +42,17 @@ A personal Claude assistant accessible via WhatsApp, with persistent memory per 
 │  └────────┬─────────┘    └────────┬─────────┘    └───────────────┘  │
 │           │                       │                                  │
 │           └───────────┬───────────┘                                  │
-│                       │ spawns container                             │
+│                       │ spawns subprocess                            │
 │                       ▼                                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                     CONTAINER (Linux VM)                              │
-├─────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    AGENT RUNNER                               │   │
+│  │                AGENT RUNNER (Node.js subprocess)               │   │
 │  │                                                                │   │
-│  │  Working directory: /workspace/group (mounted from host)       │   │
-│  │  Volume mounts:                                                │   │
-│  │    • groups/{name}/ → /workspace/group                         │   │
-│  │    • groups/global/ → /workspace/global/ (non-main only)        │   │
-│  │    • data/sessions/{group}/.claude/ → /home/node/.claude/      │   │
-│  │    • Additional dirs → /workspace/extra/*                      │   │
+│  │  Working directory: groups/{name}/                              │   │
+│  │  HOME: data/sessions/{group}/                                  │   │
+│  │  Full host access (git, node, python, etc.)                    │   │
 │  │                                                                │   │
 │  │  Tools (all groups):                                           │   │
-│  │    • Bash (safe - sandboxed in container!)                     │   │
+│  │    • Bash (native host access)                                 │   │
 │  │    • Read, Write, Edit, Glob, Grep (file operations)           │   │
 │  │    • WebSearch, WebFetch (internet access)                     │   │
 │  │    • agent-browser (browser automation)                        │   │
@@ -75,7 +69,7 @@ A personal Claude assistant accessible via WhatsApp, with persistent memory per 
 |-----------|------------|---------|
 | WhatsApp Connection | Node.js (@whiskeysockets/baileys) | Connect to WhatsApp, send/receive messages |
 | Message Storage | SQLite (better-sqlite3) | Store messages for polling |
-| Container Runtime | Containers (Linux VMs) | Isolated environments for agent execution |
+| Agent Runner | Node.js subprocess | Native process for agent execution |
 | Agent | @anthropic-ai/claude-agent-sdk (0.2.29) | Run Claude with tools and MCP servers |
 | Browser Automation | agent-browser + Chromium | Web interaction and screenshots |
 | Runtime | Node.js 20+ | Host process for routing and scheduling |
@@ -108,15 +102,13 @@ nanoclaw/
 │   ├── logger.ts                  # Pino logger setup
 │   ├── db.ts                      # SQLite database initialization and queries
 │   ├── group-queue.ts             # Per-group queue with global concurrency limit
-│   ├── mount-security.ts          # Mount allowlist validation for containers
+│   ├── mount-security.ts          # Mount allowlist validation
 │   ├── whatsapp-auth.ts           # Standalone WhatsApp authentication
 │   ├── task-scheduler.ts          # Runs scheduled tasks when due
-│   └── container-runner.ts        # Spawns agents in containers
+│   └── container-runner.ts        # Spawns native agent subprocesses
 │
 ├── container/
-│   ├── Dockerfile                 # Container image (runs as 'node' user, includes Claude Code CLI)
-│   ├── build.sh                   # Build script for container image
-│   ├── agent-runner/              # Code that runs inside the container
+│   ├── agent-runner/              # Agent runner code (runs as native subprocess)
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   └── src/
@@ -131,12 +123,11 @@ nanoclaw/
 │   └── skills/
 │       ├── setup/SKILL.md              # /setup - First-time installation
 │       ├── customize/SKILL.md          # /customize - Add capabilities
-│       ├── debug/SKILL.md              # /debug - Container debugging
+│       ├── debug/SKILL.md              # /debug - Agent debugging
 │       ├── add-telegram/SKILL.md       # /add-telegram - Telegram channel
 │       ├── add-gmail/SKILL.md          # /add-gmail - Gmail integration
 │       ├── add-voice-transcription/    # /add-voice-transcription - Whisper
 │       ├── x-integration/SKILL.md      # /x-integration - X/Twitter
-│       ├── convert-to-apple-container/  # /convert-to-apple-container - Apple Container runtime
 │       └── add-parallel/SKILL.md       # /add-parallel - Parallel agents
 │
 ├── groups/
@@ -155,13 +146,12 @@ nanoclaw/
 │
 ├── data/                          # Application state (gitignored)
 │   ├── sessions/                  # Per-group session data (.claude/ dirs with JSONL transcripts)
-│   ├── env/env                    # Copy of .env for container mounting
-│   └── ipc/                       # Container IPC (messages/, tasks/)
+│   └── ipc/                       # Agent IPC (messages/, tasks/)
 │
 ├── logs/                          # Runtime logs (gitignored)
 │   ├── nanoclaw.log               # Host stdout
 │   └── nanoclaw.error.log         # Host stderr
-│   # Note: Per-container logs are in groups/{folder}/logs/container-*.log
+│   # Note: Per-agent logs are in groups/{folder}/logs/agent-*.log
 │
 └── launchd/
     └── com.nanoclaw.plist         # macOS service configuration
@@ -180,50 +170,23 @@ export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
-// Paths are absolute (required for container mounts)
 const PROJECT_ROOT = process.cwd();
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 
-// Container configuration
-export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
+// Agent configuration
 export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10); // 30min default
 export const IPC_POLL_INTERVAL = 1000;
-export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min — keep container alive after last result
+export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min — keep agent alive after last result
 export const MAX_CONCURRENT_CONTAINERS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5);
 
 export const TRIGGER_PATTERN = new RegExp(`^@${ASSISTANT_NAME}\\b`, 'i');
 ```
 
-**Note:** Paths must be absolute for container volume mounts to work correctly.
+### Agent Configuration
 
-### Container Configuration
-
-Groups can have additional directories mounted via `containerConfig` in the SQLite `registered_groups` table (stored as JSON in the `container_config` column). Example registration:
-
-```typescript
-registerGroup("1234567890@g.us", {
-  name: "Dev Team",
-  folder: "dev-team",
-  trigger: "@Andy",
-  added_at: new Date().toISOString(),
-  containerConfig: {
-    additionalMounts: [
-      {
-        hostPath: "~/projects/webapp",
-        containerPath: "webapp",
-        readonly: false,
-      },
-    ],
-    timeout: 600000,
-  },
-});
-```
-
-Additional mounts appear at `/workspace/extra/{containerPath}` inside the container.
-
-**Mount syntax note:** Read-write mounts use `-v host:container`, but readonly mounts require `--mount "type=bind,source=...,target=...,readonly"` (the `:ro` suffix may not work on all runtimes).
+Groups can have custom timeout settings via `containerConfig` in the SQLite `registered_groups` table (stored as JSON in the `container_config` column).
 
 ### Claude Authentication
 
@@ -240,7 +203,7 @@ The token can be extracted from `~/.claude/.credentials.json` if you're logged i
 ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
 
-Only the authentication variables (`CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY`) are extracted from `.env` and written to `data/env/env`, then mounted into the container at `/workspace/env-dir/env` and sourced by the entrypoint script. This ensures other environment variables in `.env` are not exposed to the agent. This workaround is needed because some container runtimes lose `-e` environment variables when using `-i` (interactive mode with piped stdin).
+Only the authentication variables (`CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY`) are extracted from `.env` and passed to the agent subprocess via stdin as part of the input JSON. They are never written to disk or exposed as environment variables to prevent leaking to Bash commands.
 
 ### Changing the Assistant Name
 
@@ -291,8 +254,7 @@ NanoClaw uses a hierarchical memory system based on CLAUDE.md files.
 3. **Main Channel Privileges**
    - Only the "main" group (self-chat) can write to global memory
    - Main can manage registered groups and schedule tasks for any group
-   - Main can configure additional directory mounts for any group
-   - All groups have Bash access (safe because it runs inside container)
+   - All groups have Bash access with full host tool access
 
 ---
 
@@ -484,12 +446,11 @@ NanoClaw runs as a single macOS launchd service.
 ### Startup Sequence
 
 When NanoClaw starts, it:
-1. **Ensures container runtime is running** - Automatically starts it if needed; kills orphaned NanoClaw containers from previous runs
-2. Initializes the SQLite database (migrates from JSON files if they exist)
+1. Initializes the SQLite database (migrates from JSON files if they exist)
 3. Loads state from SQLite (registered groups, sessions, router state)
 4. Connects to WhatsApp (on `connection.open`):
    - Starts the scheduler loop
-   - Starts the IPC watcher for container messages
+   - Starts the IPC watcher for agent messages
    - Sets up the per-group queue with `processGroupMessages`
    - Recovers any unprocessed messages from before shutdown
    - Starts the message polling loop
@@ -555,25 +516,21 @@ tail -f logs/nanoclaw.log
 
 ## Security Considerations
 
-### Container Isolation
+### Agent Isolation
 
-All agents run inside containers (lightweight Linux VMs), providing:
-- **Filesystem isolation**: Agents can only access mounted directories
-- **Safe Bash access**: Commands run inside the container, not on your Mac
-- **Network isolation**: Can be configured per-container if needed
-- **Process isolation**: Container processes can't affect the host
-- **Non-root user**: Container runs as unprivileged `node` user (uid 1000)
+Agents run as native Node.js subprocesses on the host:
+- **Per-group working directory**: Each agent's cwd is set to its group folder
+- **Per-group session**: Each agent has its own `$HOME/.claude/` directory
+- **Full host access**: Agents can use all host dev tools (git, node, etc.)
+- **IPC isolation**: Each group has its own IPC namespace
 
 ### Prompt Injection Risk
 
 WhatsApp messages could contain malicious instructions attempting to manipulate Claude's behavior.
 
 **Mitigations:**
-- Container isolation limits blast radius
 - Only registered groups are processed
 - Trigger word required (reduces accidental processing)
-- Agents can only access their group's mounted directories
-- Main can configure additional directories per group
 - Claude's built-in safety training
 
 **Recommendations:**
@@ -586,7 +543,7 @@ WhatsApp messages could contain malicious instructions attempting to manipulate 
 
 | Credential | Storage Location | Notes |
 |------------|------------------|-------|
-| Claude CLI Auth | data/sessions/{group}/.claude/ | Per-group isolation, mounted to /home/node/.claude/ |
+| Claude CLI Auth | data/sessions/{group}/.claude/ | Per-group isolation (HOME set per agent) |
 | WhatsApp Session | store/auth/ | Auto-created, persists ~20 days |
 
 ### File Permissions
@@ -605,10 +562,9 @@ chmod 700 groups/
 | Issue | Cause | Solution |
 |-------|-------|----------|
 | No response to messages | Service not running | Check `launchctl list | grep nanoclaw` |
-| "Claude Code process exited with code 1" | Container runtime failed to start | Check logs; NanoClaw auto-starts container runtime but may fail |
-| "Claude Code process exited with code 1" | Session mount path wrong | Ensure mount is to `/home/node/.claude/` not `/root/.claude/` |
+| "Claude Code process exited with code 1" | Agent runner failed | Check logs and agent-runner build |
 | Session not continuing | Session ID not saved | Check SQLite: `sqlite3 store/messages.db "SELECT * FROM sessions"` |
-| Session not continuing | Mount path mismatch | Container user is `node` with HOME=/home/node; sessions must be at `/home/node/.claude/` |
+| Session not continuing | HOME path mismatch | Agent HOME should be `data/sessions/{group}/` |
 | "QR code expired" | WhatsApp session expired | Delete store/auth/ and restart |
 | "No groups registered" | Haven't added groups | Use `@Andy add group "Name"` in main |
 
