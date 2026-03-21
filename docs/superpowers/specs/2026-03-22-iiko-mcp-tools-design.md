@@ -8,7 +8,7 @@ Add iiko restaurant management API tools to the existing nanoclaw MCP server (`i
 
 The target API is the on-premise iikoServer REST API at `https://{host}/resto/api/`. This is NOT the newer iikoCloud/Transport API (`/api/1/`).
 
-**Authentication:** `POST /resto/api/auth?login={login}&pass={passHash}` (query params, no body) returns a **plain-text** session token string. Each active token consumes one license slot — tokens must be released via `GET /resto/api/logout?key={token}`.
+**Authentication:** `POST /resto/api/auth` with `application/x-www-form-urlencoded` body (`login={login}&pass={passHash}`) returns a **plain-text** session token string. Each active token consumes one license slot — tokens must be released via `GET /resto/api/logout?key={token}`.
 
 **Reference:** Full OLAP v2 API docs at `groups/../zbpages/Справочник/IIKO.md` and https://ru.iiko.help/articles/api-documentations/olap-otchety-v2
 
@@ -58,7 +58,7 @@ class IikoClient {
 ```
 
 **Behavior:**
-- `getToken()`: If cached token exists, return it. Otherwise call `POST /resto/api/auth?login={login}&pass={passHash}` (query params, no body). Response is a plain-text token string
+- `getToken()`: If cached token exists, return it. Otherwise call `POST /resto/api/auth` with `application/x-www-form-urlencoded` body. Response is a plain-text token string
 - `request()`: Makes HTTP request with `?key={token}`. On 401, clears cached token, re-authenticates, retries once
 - `logout()`: Calls `GET /resto/api/logout?key={token}` to release the license slot. Registered via `process.on('SIGTERM', () => { client.logout().finally(() => process.exit(0)); })`. Under SIGKILL the token will leak (unavoidable — iiko server will eventually expire it)
 - If `IIKO_HOST` is not set, the client is not initialized and all iiko tools return "iiko not configured"

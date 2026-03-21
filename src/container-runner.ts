@@ -104,7 +104,7 @@ function prepareSessionDir(groupFolder: string): string {
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ZB_GIT_PAT']);
+  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ZB_GIT_PAT', 'IIKO_HOST', 'IIKO_LOGIN', 'IIKO_PASS_HASH']);
 }
 
 // ── Container mode helpers ──────────────────────────────────────────

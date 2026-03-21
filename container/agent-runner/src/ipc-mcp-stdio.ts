@@ -10,6 +10,7 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { CronExpressionParser } from 'cron-parser';
+import { createIikoClient } from './iiko-client.js';
 
 const IPC_DIR = process.env.NANOCLAW_IPC_DIR || '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
@@ -277,6 +278,174 @@ Use available_groups.json to find the JID for a group. The folder name should be
     return {
       content: [{ type: 'text' as const, text: `Group "${args.name}" registered. It will start receiving messages immediately.` }],
     };
+  },
+);
+
+// ── iiko integration ──────────────────────────────────────────────────
+
+const iikoClient = createIikoClient();
+
+function iikoNotConfigured() {
+  return {
+    content: [{ type: 'text' as const, text: 'iiko integration not configured. Set IIKO_HOST, IIKO_LOGIN, IIKO_PASS_HASH in .env.' }],
+    isError: true,
+  };
+}
+
+function iikoError(err: unknown) {
+  return {
+    content: [{ type: 'text' as const, text: `iiko error: ${err instanceof Error ? err.message : String(err)}` }],
+    isError: true,
+  };
+}
+
+server.tool(
+  'iiko_olap_columns',
+  'Get available OLAP report fields with their types and capabilities (grouping, aggregation, filtering). Call this to discover which fields you can use in iiko_olap_report.',
+  {
+    report_type: z.enum(['SALES', 'TRANSACTIONS', 'DELIVERIES']).describe('Report type'),
+  },
+  async (args) => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', `/v2/reports/olap/columns?reportType=${args.report_type}`);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_olap_report',
+  `Query iiko OLAP reports for sales, transaction, or delivery analytics. Builds the request with standard exclusion filters (non-deleted orders only, no stornos).
+
+Use iiko_olap_columns first to discover available fields for grouping and aggregation.
+
+Common group_by_rows fields (SALES): DishName, DishGroup, DishCategory, Department, Cashier, OpenDate.Typed, YearOpen, MonthOpen, WeekInYearOpen, DayOfWeekOpen, HourOpen, OrderNum, WaiterName, TableNum
+Common aggregate_fields (SALES): DishSumInt, DishDiscountSumInt, DishAmountInt, UniqOrderId, ProductCostBase.OneItem, FullSum`,
+  {
+    report_type: z.enum(['SALES', 'TRANSACTIONS', 'DELIVERIES']).describe('Report type'),
+    date_from: z.string().describe('Start date YYYY-MM-DD'),
+    date_to: z.string().describe('End date YYYY-MM-DD'),
+    group_by_rows: z.array(z.string()).describe('Fields to group by rows'),
+    aggregate_fields: z.array(z.string()).describe('Fields to aggregate'),
+    filters: z.record(z.string(), z.any()).optional().describe('Additional filters (iiko filter format). Date and deletion filters are added automatically.'),
+  },
+  async (args) => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const body = {
+        reportType: args.report_type,
+        buildSummary: 'false',
+        groupByRowFields: args.group_by_rows,
+        aggregateFields: args.aggregate_fields,
+        filters: {
+          'OpenDate.Typed': {
+            filterType: 'DateRange',
+            periodType: 'CUSTOM',
+            from: `${args.date_from}T00:00:00.000`,
+            to: `${args.date_to}T00:00:00.000`,
+            includeLow: 'true',
+            includeHigh: 'true',
+          },
+          OrderDeleted: {
+            filterType: 'IncludeValues',
+            values: ['NOT_DELETED'],
+          },
+          DeletedWithWriteoff: {
+            filterType: 'ExcludeValues',
+            values: ['DELETED_WITH_WRITEOFF', 'DELETED_WITHOUT_WRITEOFF'],
+          },
+          Storned: {
+            filterType: 'ExcludeValues',
+            values: ['TRUE'],
+          },
+          ...(args.filters || {}),
+        },
+      };
+
+      const result = await iikoClient.request('POST', '/v2/reports/olap', body) as { data?: unknown[] };
+      const data = result.data || result;
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_stores',
+  'List all stores/warehouses from iiko.',
+  {},
+  async () => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', '/corporation/stores');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_departments',
+  'List all departments/locations from iiko.',
+  {},
+  async () => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', '/corporation/departments');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_products',
+  'Get the product catalog (menu items, ingredients, etc.) from iiko.',
+  {},
+  async () => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', '/products');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_suppliers',
+  'List all suppliers from iiko.',
+  {},
+  async () => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', '/suppliers');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
+  },
+);
+
+server.tool(
+  'iiko_employees',
+  'List all employees from iiko.',
+  {},
+  async () => {
+    if (!iikoClient) return iikoNotConfigured();
+    try {
+      const data = await iikoClient.request('GET', '/employees');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      return iikoError(err);
+    }
   },
 );
 
