@@ -17,10 +17,19 @@ Single Node.js process that connects to WhatsApp/Telegram, routes messages to Cl
 | `src/config.ts` | Trigger pattern, paths, intervals |
 | `src/container-runner.ts` | Spawns native agent processes |
 | `src/task-scheduler.ts` | Runs scheduled tasks |
-| `src/db.ts` | SQLite operations |
-| `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
+| `src/db.ts` | SQLite operations (better-sqlite3) |
+| `groups/{name}/CLAUDE.md` | Per-group instructions (isolated) |
+| `groups/{name}/.claude/` | Per-group SDK state (sessions, memory, settings) |
 | `container/agent-runner/` | Agent runner code (Claude Agent SDK, runs as subprocess) |
 | `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
+
+## Database
+
+- **Path**: `store/messages.db` (better-sqlite3, NOT `data/`)
+- Tables: `chats`, `messages`, `registered_groups`, `sessions`, `scheduled_tasks`, `task_run_logs`, `router_state`
+- `registered_groups` stores trigger patterns, group folders, container config
+- `sessions` maps group folders to Claude SDK session IDs
+- DB uses WAL mode — external reads require the process to not hold an exclusive lock
 
 ## Skills
 
