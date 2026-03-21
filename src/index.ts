@@ -151,6 +151,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   if (missedMessages.length === 0) return true;
 
+  logger.debug(
+    { group: group.name, chatJid, messageCount: missedMessages.length, sinceTimestamp },
+    'Checking messages for trigger',
+  );
+
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
     // Use per-group trigger pattern if set, otherwise fall back to global
@@ -159,6 +164,15 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       : TRIGGER_PATTERN;
     const hasTrigger = missedMessages.some((m) =>
       triggerRegex.test(m.content.trim()),
+    );
+    logger.debug(
+      {
+        group: group.name,
+        triggerPattern: triggerRegex.source,
+        hasTrigger,
+        messages: missedMessages.map((m) => m.content.trim().substring(0, 50)),
+      },
+      hasTrigger ? 'Trigger matched' : 'No trigger match, skipping',
     );
     if (!hasTrigger) return true;
   }
@@ -366,8 +380,11 @@ async function startMessageLoop(): Promise<void> {
           // Non-trigger messages accumulate in DB and get pulled as
           // context when a trigger eventually arrives.
           if (needsTrigger) {
+            const triggerRegex = group.trigger
+              ? new RegExp(group.trigger, 'iu')
+              : TRIGGER_PATTERN;
             const hasTrigger = groupMessages.some((m) =>
-              TRIGGER_PATTERN.test(m.content.trim()),
+              triggerRegex.test(m.content.trim()),
             );
             if (!hasTrigger) continue;
           }
