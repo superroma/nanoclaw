@@ -614,7 +614,21 @@ async function main(): Promise<void> {
     while (true) {
       log(`Starting query (session: ${sessionId || 'new'}, resumeAt: ${resumeAt || 'latest'})...`);
 
-      const queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, sdkEnv, resumeAt);
+      let queryResult;
+      try {
+        queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, sdkEnv, resumeAt);
+      } catch (err) {
+        // If resuming a session failed, retry with a fresh session
+        if (sessionId) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log(`Query with session ${sessionId} failed: ${errMsg}, retrying with fresh session`);
+          sessionId = undefined;
+          resumeAt = undefined;
+          queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, sdkEnv);
+        } else {
+          throw err;
+        }
+      }
       if (queryResult.newSessionId) {
         sessionId = queryResult.newSessionId;
       }
