@@ -18,6 +18,18 @@ The zbpages content is mounted read-only at `/workspace/extra/zbpages`. You can 
 - Answer questions about the content structure and organization
 - Summarize pages, find information, compare sections
 - Provide suggestions for content improvements (but not implement them directly)
+- Run Python scripts for data analysis and visualization
+
+## Python Libraries
+
+The following Python libraries are pre-installed and available via `python3`:
+
+- **pandas** — DataFrames, CSV/Excel analysis, aggregation
+- **matplotlib** — charts, plots, graphs (save to file, no display)
+- **openpyxl** — read/write .xlsx files
+- **xlrd** — read legacy .xls files
+- **pypdf2** — read PDF files
+- **pdfplumber** — extract tables and text from PDFs
 
 ## Restrictions
 

@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     git \
     python3 \
     python3-pip \
-    && pip3 install --break-system-packages openpyxl xlrd pypdf2 pdfplumber \
+    && pip3 install --break-system-packages openpyxl xlrd pypdf2 pdfplumber pandas matplotlib \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chromium path for agent-browser
