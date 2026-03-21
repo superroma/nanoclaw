@@ -301,7 +301,7 @@ function iikoError(err: unknown) {
 
 server.tool(
   'iiko_olap_columns',
-  'Get available OLAP report fields with their types and capabilities (grouping, aggregation, filtering). Call this to discover which fields you can use in iiko_olap_report.',
+  'Get available OLAP report fields with their types and capabilities (grouping, aggregation, filtering). Call this to discover which fields you can use in iiko_olap_report. See iiko.md in the global directory for full usage reference.',
   {
     report_type: z.enum(['SALES', 'TRANSACTIONS', 'DELIVERIES']).describe('Report type'),
   },
@@ -318,12 +318,9 @@ server.tool(
 
 server.tool(
   'iiko_olap_report',
-  `Query iiko OLAP reports for sales, transaction, or delivery analytics. Builds the request with standard exclusion filters (non-deleted orders only, no stornos).
+  `Query iiko OLAP reports for sales, transaction, or delivery analytics. Builds the request with standard exclusion filters (non-deleted orders only, no stornos). See iiko.md in the global directory for full usage reference, common fields, and examples.
 
-Use iiko_olap_columns first to discover available fields for grouping and aggregation.
-
-Common group_by_rows fields (SALES): DishName, DishGroup, DishCategory, Department, Cashier, OpenDate.Typed, YearOpen, MonthOpen, WeekInYearOpen, DayOfWeekOpen, HourOpen, OrderNum, WaiterName, TableNum
-Common aggregate_fields (SALES): DishSumInt, DishDiscountSumInt, DishAmountInt, UniqOrderId, ProductCostBase.OneItem, FullSum`,
+Use iiko_olap_columns first to discover available fields for grouping and aggregation.`,
   {
     report_type: z.enum(['SALES', 'TRANSACTIONS', 'DELIVERIES']).describe('Report type'),
     date_from: z.string().describe('Start date YYYY-MM-DD'),
