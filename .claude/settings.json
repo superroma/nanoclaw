@@ -4,7 +4,6 @@
       "Bash(*)",
       "Read",
       "Edit"
-    ],
-    "deny": ["Bash(git push *)"]
+    ]
   }
 }
