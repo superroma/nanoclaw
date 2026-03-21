@@ -570,6 +570,24 @@ async function main(): Promise<void> {
     sdkEnv[key] = value;
   }
 
+  // Configure git credential helper if a PAT was provided.
+  // This runs before the agent starts so git push works inside containers.
+  if (containerInput.secrets?.ZB_GIT_PAT) {
+    const pat = containerInput.secrets.ZB_GIT_PAT;
+    try {
+      const { execSync } = await import('child_process');
+      execSync(
+        `git config --global credential.helper '!f() { echo "password=${pat}"; }; f'`,
+        { stdio: 'pipe' },
+      );
+      execSync(`git config --global user.name "zbadmin"`, { stdio: 'pipe' });
+      execSync(`git config --global user.email "zbadmin@nanoclaw"`, { stdio: 'pipe' });
+      log('Git credential helper configured with PAT');
+    } catch (err) {
+      log(`Warning: failed to configure git credential helper: ${err}`);
+    }
+  }
+
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const mcpServerPath = path.join(__dirname, 'ipc-mcp-stdio.js');
 

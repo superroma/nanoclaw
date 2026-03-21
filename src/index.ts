@@ -19,6 +19,10 @@ import {
   writeTasksSnapshot,
 } from './container-runner.js';
 import {
+  cleanupOrphans,
+  ensureContainerRuntimeRunning,
+} from './container-runtime.js';
+import {
   getAllChats,
   getAllRegisteredGroups,
   getAllSessions,
@@ -422,6 +426,15 @@ async function main(): Promise<void> {
   initDatabase();
   logger.info('Database initialized');
   loadState();
+
+  // If any group uses container runtime, verify it's available and clean up orphans
+  const hasContainerGroups = Object.values(registeredGroups).some(
+    (g) => g.containerConfig?.runtime === 'container',
+  );
+  if (hasContainerGroups) {
+    ensureContainerRuntimeRunning();
+    cleanupOrphans();
+  }
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {

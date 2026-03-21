@@ -28,6 +28,7 @@ export interface AllowedRoot {
 }
 
 export interface ContainerConfig {
+  runtime?: 'native' | 'container'; // Default: 'native'
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default: 300000 (5 minutes)
 }

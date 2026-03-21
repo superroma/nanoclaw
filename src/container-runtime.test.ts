@@ -1,8 +1,17 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { CONTAINER_RUNTIME_BIN, readonlyMountArgs, stopContainer } from './container-runtime.js';
 
 describe('container-runtime', () => {
-  it('module is gutted — agents run natively', () => {
-    // Container runtime is no longer used.
-    // Agents spawn as native Node.js processes.
+  it('uses Apple Container CLI binary', () => {
+    expect(CONTAINER_RUNTIME_BIN).toBe('container');
+  });
+
+  it('generates correct readonly mount args', () => {
+    const args = readonlyMountArgs('/host/path', '/container/path');
+    expect(args).toEqual(['-v', '/host/path:/container/path:ro']);
+  });
+
+  it('generates correct stop command', () => {
+    expect(stopContainer('nanoclaw-test-123')).toBe('container stop -t 1 nanoclaw-test-123');
   });
 });
