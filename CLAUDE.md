@@ -38,19 +38,11 @@ Single Node.js process that connects to WhatsApp/Telegram, routes messages to Cl
 Run commands directly—don't tell the user to run them.
 
 ```bash
-npm run dev          # Run with hot reload
 npm run build        # Compile TypeScript (main + agent-runner)
 ```
 
-Service management:
+Running:
 ```bash
-# macOS (launchd)
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
-
-# Linux (systemd)
-systemctl --user start nanoclaw
-systemctl --user stop nanoclaw
-systemctl --user restart nanoclaw
+npm start            # Run in foreground (production)
+npm run dev          # Run with hot reload (development)
 ```

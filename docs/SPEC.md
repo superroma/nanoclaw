@@ -153,8 +153,7 @@ nanoclaw/
 │   └── nanoclaw.error.log         # Host stderr
 │   # Note: Per-agent logs are in groups/{folder}/logs/agent-*.log
 │
-└── launchd/
-    └── com.nanoclaw.plist         # macOS service configuration
+└── container/                     # Agent runner and container build files
 ```
 
 ---
@@ -455,58 +454,14 @@ When NanoClaw starts, it:
    - Recovers any unprocessed messages from before shutdown
    - Starts the message polling loop
 
-### Service: com.nanoclaw
-
-**launchd/com.nanoclaw.plist:**
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.nanoclaw</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{{NODE_PATH}}</string>
-        <string>{{PROJECT_ROOT}}/dist/index.js</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>{{PROJECT_ROOT}}</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>{{HOME}}/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <key>HOME</key>
-        <string>{{HOME}}</string>
-        <key>ASSISTANT_NAME</key>
-        <string>Andy</string>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>{{PROJECT_ROOT}}/logs/nanoclaw.log</string>
-    <key>StandardErrorPath</key>
-    <string>{{PROJECT_ROOT}}/logs/nanoclaw.error.log</string>
-</dict>
-</plist>
-```
-
-### Managing the Service
+### Running the Service
 
 ```bash
-# Install service
-cp launchd/com.nanoclaw.plist ~/Library/LaunchAgents/
+# Production
+npm run build && npm start
 
-# Start service
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-
-# Stop service
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-
-# Check status
-launchctl list | grep nanoclaw
+# Development (hot reload)
+npm run dev
 
 # View logs
 tail -f logs/nanoclaw.log
@@ -561,7 +516,7 @@ chmod 700 groups/
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No response to messages | Service not running | Check `launchctl list | grep nanoclaw` |
+| No response to messages | Process not running | Check `ps aux | grep "node dist/index"` |
 | "Claude Code process exited with code 1" | Agent runner failed | Check logs and agent-runner build |
 | Session not continuing | Session ID not saved | Check SQLite: `sqlite3 store/messages.db "SELECT * FROM sessions"` |
 | Session not continuing | HOME path mismatch | Agent HOME should be `data/sessions/{group}/` |

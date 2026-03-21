@@ -14,9 +14,8 @@ Both timers fire at the same time, so agents always exit via hard SIGKILL instea
 ## Quick Status Check
 
 ```bash
-# 1. Is the service running?
-launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+# 1. Is the process running?
+ps aux | grep "node dist/index" | grep -v grep
 
 # 2. Recent errors in service log?
 grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
@@ -106,18 +105,15 @@ npm run auth
 ## Service Management
 
 ```bash
-# Restart the service
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Start (foreground)
+npm start
+
+# Start with hot reload (development)
+npm run dev
 
 # View live logs
 tail -f logs/nanoclaw.log
 
-# Stop the service
-launchctl bootout gui/$(id -u)/com.nanoclaw
-
-# Start the service
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
-
 # Rebuild after code changes
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+npm run build
 ```
