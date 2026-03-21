@@ -64,6 +64,29 @@ server.tool(
 );
 
 server.tool(
+  'send_file',
+  'Send a file (image, document, etc.) to the user or group. Images (.png, .jpg, .gif, .webp) are displayed inline; other files are sent as documents. Use an absolute path to the file.',
+  {
+    file_path: z.string().describe('Absolute path to the file to send'),
+    caption: z.string().optional().describe('Optional caption/description for the file'),
+  },
+  async (args) => {
+    const data: Record<string, string | undefined> = {
+      type: 'file',
+      chatJid,
+      filePath: args.file_path,
+      caption: args.caption || undefined,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    };
+
+    writeIpcFile(MESSAGES_DIR, data);
+
+    return { content: [{ type: 'text' as const, text: 'File sent.' }] };
+  },
+);
+
+server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools.
 
