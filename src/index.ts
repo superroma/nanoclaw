@@ -157,7 +157,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   );
 
   // For non-main groups, check if trigger is required and present
-  if (!isMainGroup && group.requiresTrigger !== false) {
+  // Skip trigger check if there's already an active container (follow-up conversation)
+  if (!isMainGroup && group.requiresTrigger !== false && !queue.isActive(chatJid)) {
     // Use per-group trigger pattern if set, otherwise fall back to global
     const triggerRegex = group.trigger
       ? new RegExp(group.trigger, 'iu')
@@ -376,10 +377,11 @@ async function startMessageLoop(): Promise<void> {
           const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
           const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
 
-          // For non-main groups, only act on trigger messages.
+          // For non-main groups, only act on trigger messages —
+          // unless there's already an active container (follow-up conversation).
           // Non-trigger messages accumulate in DB and get pulled as
           // context when a trigger eventually arrives.
-          if (needsTrigger) {
+          if (needsTrigger && !queue.isActive(chatJid)) {
             const triggerRegex = group.trigger
               ? new RegExp(group.trigger, 'iu')
               : TRIGGER_PATTERN;
