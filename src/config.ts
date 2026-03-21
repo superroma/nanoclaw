@@ -11,6 +11,7 @@ const envConfig = readEnvFile([
   'ASSISTANT_HAS_OWN_NUMBER',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_ONLY',
+  'TOOL_STATUS_GROUPS',
 ]);
 
 export const ASSISTANT_NAME =
@@ -74,3 +75,9 @@ export const TELEGRAM_BOT_TOKEN =
   process.env.TELEGRAM_BOT_TOKEN || envConfig.TELEGRAM_BOT_TOKEN || '';
 export const TELEGRAM_ONLY =
   (process.env.TELEGRAM_ONLY || envConfig.TELEGRAM_ONLY) === 'true';
+
+// Comma-separated list of group folders that show tool status messages (e.g. "main,zbadmin")
+const toolStatusRaw = process.env.TOOL_STATUS_GROUPS || envConfig.TOOL_STATUS_GROUPS || '';
+export const TOOL_STATUS_GROUPS = new Set(
+  toolStatusRaw.split(',').map((s) => s.trim()).filter(Boolean),
+);

@@ -27,6 +27,7 @@ interface ContainerInput {
   isMain: boolean;
   isScheduledTask?: boolean;
   assistantName?: string;
+  showToolStatus?: boolean;
   secrets?: Record<string, string>;
   paths?: {
     group: string;
@@ -485,8 +486,8 @@ async function runQuery(
           writeOutput({ status: 'success', result: text, newSessionId });
         }
 
-        // Forward tool_use blocks as status notifications
-        const toolUses = contentArr.filter((c) => c.type === 'tool_use');
+        // Forward tool_use blocks as status notifications (if enabled)
+        const toolUses = containerInput.showToolStatus ? contentArr.filter((c) => c.type === 'tool_use') : [];
         for (const tool of toolUses) {
           const name = tool.name as string;
           const input = tool.input as Record<string, unknown> | undefined;

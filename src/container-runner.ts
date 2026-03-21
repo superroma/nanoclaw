@@ -39,6 +39,7 @@ export interface ContainerInput {
   isMain: boolean;
   isScheduledTask?: boolean;
   assistantName?: string;
+  showToolStatus?: boolean;
   secrets?: Record<string, string>;
   paths?: {
     group: string;

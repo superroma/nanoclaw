@@ -8,6 +8,7 @@ import {
   POLL_INTERVAL,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_ONLY,
+  TOOL_STATUS_GROUPS,
   TRIGGER_PATTERN,
 } from './config.js';
 import { TelegramChannel } from './channels/telegram.js';
@@ -307,6 +308,7 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        showToolStatus: TOOL_STATUS_GROUPS.has(group.folder),
       },
       (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
