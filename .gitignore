@@ -16,8 +16,7 @@ groups/*
 groups/main/*
 groups/global/*
 !groups/main/CLAUDE.md
-!groups/global/CLAUDE.md
-!groups/global/iiko.md
+!groups/global/*.md
 !groups/zbadmin/
 groups/zbadmin/*
 !groups/zbadmin/CLAUDE.md
