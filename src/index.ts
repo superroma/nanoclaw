@@ -153,8 +153,12 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
+    // Use per-group trigger pattern if set, otherwise fall back to global
+    const triggerRegex = group.trigger
+      ? new RegExp(group.trigger, 'iu')
+      : TRIGGER_PATTERN;
     const hasTrigger = missedMessages.some((m) =>
-      TRIGGER_PATTERN.test(m.content.trim()),
+      triggerRegex.test(m.content.trim()),
     );
     if (!hasTrigger) return true;
   }
