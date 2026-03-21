@@ -20,9 +20,23 @@ groups/global/*
 !groups/zbadmin/
 groups/zbadmin/*
 !groups/zbadmin/CLAUDE.md
+!groups/zbadmin/.claude/
+groups/zbadmin/.claude/*
+!groups/zbadmin/.claude/projects/
+groups/zbadmin/.claude/projects/*
+!groups/zbadmin/.claude/projects/-workspace-group/
+groups/zbadmin/.claude/projects/-workspace-group/*
+!groups/zbadmin/.claude/projects/-workspace-group/memory/
 !groups/zbmanager/
 groups/zbmanager/*
 !groups/zbmanager/CLAUDE.md
+!groups/zbmanager/.claude/
+groups/zbmanager/.claude/*
+!groups/zbmanager/.claude/projects/
+groups/zbmanager/.claude/projects/*
+!groups/zbmanager/.claude/projects/-workspace-group/
+groups/zbmanager/.claude/projects/-workspace-group/*
+!groups/zbmanager/.claude/projects/-workspace-group/memory/
 
 # Secrets
 *.keys.json

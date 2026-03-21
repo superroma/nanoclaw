@@ -68,8 +68,7 @@ interface VolumeMount {
  */
 function prepareSessionDir(groupFolder: string): string {
   const groupSessionsDir = path.join(
-    DATA_DIR,
-    'sessions',
+    GROUPS_DIR,
     groupFolder,
     '.claude',
   );
