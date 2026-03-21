@@ -11,7 +11,7 @@ import {
 } from './config.js';
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
-import { isValidGroupFolder } from './group-folder.js';
+import { isValidGroupFolder, resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
 
@@ -81,7 +81,13 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
                   if (data.type === 'file' && data.filePath) {
-                    await deps.sendFile(data.chatJid, data.filePath, data.caption);
+                    // Translate container paths to host paths
+                    let hostFilePath = data.filePath as string;
+                    if (hostFilePath.startsWith('/workspace/group/')) {
+                      const groupDir = resolveGroupFolderPath(sourceGroup);
+                      hostFilePath = path.join(groupDir, hostFilePath.slice('/workspace/group/'.length));
+                    }
+                    await deps.sendFile(data.chatJid, hostFilePath, data.caption);
                     logger.info(
                       { chatJid: data.chatJid, sourceGroup, filePath: data.filePath },
                       'IPC file sent',
